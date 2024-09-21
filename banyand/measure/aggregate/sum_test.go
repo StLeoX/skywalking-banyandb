@@ -18,6 +18,7 @@
 package aggregate_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,4 +47,27 @@ func TestSum(t *testing.T) {
 	assert.NoError(t, err)
 	_, _, r2 := sumFloat64.Result()
 	assert.Equal(t, 6.0, r2)
+}
+
+func BenchmarkSum(b *testing.B) {
+	sumFloat64 := &aggregate.Sum[float64, aggregate.Void, float64]{}
+
+	floats := make([]float64, 100) // delta measure of 100 float elements
+	for i := 0; i < 100; i++ {
+		floats[i] = float64(i)
+	}
+	arguments := aggregate.NewSumArguments[float64](floats)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = sumFloat64.Combine(arguments)
+	}
+	fmt.Printf("combine elapse: %s\n", b.Elapsed().String())
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = sumFloat64.Combine4(arguments)
+	}
+	fmt.Printf("combine4 elapse: %s\n", b.Elapsed().String())
+
 }

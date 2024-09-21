@@ -32,6 +32,17 @@ func (f *Sum[A, B, R]) Combine(arguments Arguments[A, B]) error {
 	return nil
 }
 
+// Combine4 takes elements to do the aggregation.
+// Sum uses type parameter A.
+// Combine4 unrolls elements with factor-4.
+func (f *Sum[A, B, R]) Combine4(arguments Arguments[A, B]) error {
+	for i := 0; i < len(arguments.arg0); i += 4 {
+		f.summation += R(arguments.arg0[i]) + R(arguments.arg0[i+1]) +
+			R(arguments.arg0[i+2]) + R(arguments.arg0[i+3])
+	}
+	return nil
+}
+
 // Result gives the result for the aggregation.
 func (f *Sum[A, B, R]) Result() (A, B, R) {
 	return A(f.summation), zeroValue[B](), f.summation
