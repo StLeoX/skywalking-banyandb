@@ -183,7 +183,8 @@ func parseConditionToQuery(cond *modelv1.Condition, indexRule *databasev1.IndexR
 		node := newTermNode(str, indexRule)
 		return &queryNode{query, node}, [][]*modelv1.TagValue{entity}, false, nil
 	case modelv1.Condition_BINARY_OP_MATCH:
-		query := bluge.NewMatchQuery(term).SetField(field).SetAnalyzer(Analyzers[indexRule.Analyzer])
+		analyzer, operator := getMatchOptions(indexRule.Analyzer, cond.MatchOption)
+		query := bluge.NewMatchQuery(term).SetField(field).SetAnalyzer(analyzer).SetOperator(operator)
 		node := newMatchNode(str, indexRule)
 		return &queryNode{query, node}, [][]*modelv1.TagValue{entity}, false, nil
 	case modelv1.Condition_BINARY_OP_NE:
@@ -335,11 +336,11 @@ type termRangeInclusiveNode struct {
 	maxInclusive bool
 }
 
-func newTermRangeInclusiveNode(min, max string, minInclusive, maxInclusive bool, indexRule *databasev1.IndexRule) *termRangeInclusiveNode {
+func newTermRangeInclusiveNode(minVal, maxVal string, minInclusive, maxInclusive bool, indexRule *databasev1.IndexRule) *termRangeInclusiveNode {
 	return &termRangeInclusiveNode{
 		indexRule:    indexRule,
-		min:          min,
-		max:          max,
+		min:          minVal,
+		max:          maxVal,
 		minInclusive: minInclusive,
 		maxInclusive: maxInclusive,
 	}
@@ -361,7 +362,9 @@ func (t *termRangeInclusiveNode) MarshalJSON() ([]byte, error) {
 		builder.WriteString(")")
 	}
 	inner["range"] = builder.String()
-	inner["index"] = t.indexRule.Metadata.Name + ":" + t.indexRule.Metadata.Group
+	if t.indexRule != nil {
+		inner["index"] = t.indexRule.Metadata.Name + ":" + t.indexRule.Metadata.Group
+	}
 	data := make(map[string]interface{}, 1)
 	data["termRangeInclusive"] = inner
 	return json.Marshal(data)
@@ -385,7 +388,9 @@ func newTermNode(term string, indexRule *databasev1.IndexRule) *termNode {
 
 func (t *termNode) MarshalJSON() ([]byte, error) {
 	inner := make(map[string]interface{}, 1)
-	inner["index"] = t.indexRule.Metadata.Name + ":" + t.indexRule.Metadata.Group
+	if t.indexRule != nil {
+		inner["index"] = t.indexRule.Metadata.Name + ":" + t.indexRule.Metadata.Group
+	}
 	inner["value"] = t.term
 	data := make(map[string]interface{}, 1)
 	data["term"] = inner
@@ -412,7 +417,7 @@ func (m *matchNode) MarshalJSON() ([]byte, error) {
 	inner := make(map[string]interface{}, 1)
 	inner["index"] = m.indexRule.Metadata.Name + ":" + m.indexRule.Metadata.Group
 	inner["value"] = m.match
-	inner["analyzer"] = databasev1.IndexRule_Analyzer_name[int32(m.indexRule.Analyzer)]
+	inner["analyzer"] = m.indexRule.Analyzer
 	data := make(map[string]interface{}, 1)
 	data["match"] = inner
 	return json.Marshal(data)
@@ -423,23 +428,18 @@ func (m *matchNode) String() string {
 }
 
 type prefixNode struct {
-	indexRule *databasev1.IndexRule
-	prefix    string
+	prefix string
 }
 
-func newPrefixNode(prefix string, indexRule *databasev1.IndexRule) *prefixNode {
+func newPrefixNode(prefix string) *prefixNode {
 	return &prefixNode{
-		indexRule: indexRule,
-		prefix:    prefix,
+		prefix: prefix,
 	}
 }
 
 func (m *prefixNode) MarshalJSON() ([]byte, error) {
-	inner := make(map[string]interface{}, 1)
-	inner["index"] = m.indexRule.Metadata.Name + ":" + m.indexRule.Metadata.Group
-	inner["value"] = m.prefix
 	data := make(map[string]interface{}, 1)
-	data["prefix"] = inner
+	data["prefix"] = m.prefix
 	return json.Marshal(data)
 }
 
@@ -448,23 +448,18 @@ func (m *prefixNode) String() string {
 }
 
 type wildcardNode struct {
-	indexRule *databasev1.IndexRule
-	wildcard  string
+	wildcard string
 }
 
-func newWildcardNode(wildcard string, indexRule *databasev1.IndexRule) *wildcardNode {
+func newWildcardNode(wildcard string) *wildcardNode {
 	return &wildcardNode{
-		indexRule: indexRule,
-		wildcard:  wildcard,
+		wildcard: wildcard,
 	}
 }
 
 func (m *wildcardNode) MarshalJSON() ([]byte, error) {
-	inner := make(map[string]interface{}, 1)
-	inner["index"] = m.indexRule.Metadata.Name + ":" + m.indexRule.Metadata.Group
-	inner["value"] = m.wildcard
 	data := make(map[string]interface{}, 1)
-	data["wildcard"] = inner
+	data["wildcard"] = m.wildcard
 	return json.Marshal(data)
 }
 
